@@ -1,0 +1,33 @@
+name: compatibility
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.12', '3.13']
+        core: ['e95c89399da1fb3a6e62f5f690a1625d8685bde4', 'master']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/checkout@v4
+        with:
+          repository: nitisbig/Faceless-Champ
+          ref: ${{ matrix.core }}
+          path: core-checkout
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: python -m pip install build pytest ruff
+      - run: python -m build core-checkout --outdir core-dist
+      - run: python -m pip install core-dist/*.whl
+      - run: python -m build
+      - run: python -m pip install dist/*.whl
+      - run: ruff check src tests scripts examples
+      - run: pytest
+      - name: Installed wheel media test outside source tree
+        run: cd /tmp && python "$GITHUB_WORKSPACE/scripts/verify_media.py" --output /tmp/kit-verification
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verification-${{ matrix.python }}-${{ matrix.core }}
+          path: /tmp/kit-verification
